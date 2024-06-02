@@ -26,7 +26,7 @@ Some quirks are to be expected.
 A list of things to resolve before marking this adapter as "stable".
 
 - [ ] Debug issues raised by Arrow during certain `SELECT` statements.
-- [ ] Make catalog faster.
+- [x] Make catalog faster.
 - [ ] Add views to catalog.
 - [ ] Add test(s) that create keyspaces, tables.
 - [ ] Add an option to set the protocol level manually.
