@@ -80,14 +80,13 @@ class HarlequinCassandraConnection(HarlequinConnection):
         init_message: str = "",
         auth_options: dict[str, Any],
         options: dict[str, Any],
+        connection_options: dict[str, Any],
     ) -> None:
         self.init_message = init_message
         try:
             auth_provider = PlainTextAuthProvider(**auth_options)
-            self.cluster = Cluster(
-                [options["host"]], port=options["port"], auth_provider=auth_provider
-            )
-            self.session = self.cluster.connect()
+            self.cluster = Cluster(**options, auth_provider=auth_provider)
+            self.session = self.cluster.connect(**connection_options)
         except Exception as e:
             raise HarlequinConnectionError(
                 msg=str(e), title="Harlequin could not connect to Cassandra."
@@ -229,20 +228,27 @@ class HarlequinCassandraAdapter(HarlequinAdapter):
         keyspace: str | None = None,
         username: str | None = None,
         password: str | None = None,
+        protocol_version: int | None = None,
         **_: Any,
     ) -> None:
         self.auth_options = {
             "username": username,
             "password": password,
         }
-        self.options = {
-            "host": host,
+        self.options: dict[str, Any] = {
+            "contact_points": [host],
             "port": port,
-            "keyspace": keyspace,
         }
+        self.connection_options: dict[str, Any] = {}
+        if protocol_version:
+            self.options["protocol_version"] = int(protocol_version)
+        if keyspace:
+            self.connection_options["keyspace"] = keyspace
 
     def connect(self) -> HarlequinCassandraConnection:
         conn = HarlequinCassandraConnection(
-            auth_options=self.auth_options, options=self.options
+            auth_options=self.auth_options,
+            options=self.options,
+            connection_options=self.connection_options,
         )
         return conn

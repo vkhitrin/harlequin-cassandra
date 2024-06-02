@@ -29,7 +29,7 @@ A list of things to resolve before marking this adapter as "stable".
 - [x] Make catalog faster.
 - [ ] Add views to catalog.
 - [ ] Add test(s) that create keyspaces, tables.
-- [ ] Add an option to set the protocol level manually.
+- [x] Add an option to set the protocol level manually.
 - [ ] Add an option to support execution profiles.
 - [ ] Add an option to support load-balancing policies.
 - [ ] Add an option to support consistency levels.
