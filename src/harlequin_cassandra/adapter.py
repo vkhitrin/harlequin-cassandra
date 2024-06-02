@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any
 
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.cluster import Cluster, ResultSet, Session
 from cassandra.cqltypes import CassandraType
+from cassandra.metadata import KeyspaceMetadata
 from cassandra.protocol import SyntaxException
 from cassandra.query import SimpleStatement
 from harlequin import (
@@ -162,20 +163,30 @@ class HarlequinCassandraConnection(HarlequinConnection):
         return MAPPING.get(col_type, "?")
 
     def get_catalog(self) -> Catalog:
-        keyspaces = self.cluster.metadata.keyspaces
+        keyspaces_metadata: dict[str, KeyspaceMetadata] = (
+            self.cluster.metadata.keyspaces
+        )
         keyspace_items: list[CatalogItem] = []
-        for keyspace in keyspaces:
-            tables = self._get_tables(keyspace)
+        for keyspace in keyspaces_metadata:
+            tables: list[str] = list(keyspaces_metadata.get(keyspace).tables.keys())
             table_items: list[CatalogItem] = []
             for table in tables:
                 column_items: list[CatalogItem] = []
-                columns = self._get_columns(keyspace, table)
-                for column_name, column_type in columns:
+                columns: list[str] = list(
+                    keyspaces_metadata.get(keyspace).tables.get(table).columns.keys()
+                )
+                for column in columns:
+                    column_type = (
+                        keyspaces_metadata.get(keyspace)
+                        .tables.get(table)
+                        .columns.get(column)
+                        .cql_type
+                    )
                     column_items.append(
                         CatalogItem(
-                            qualified_identifier=f'"{keyspace}"."{table}"."{column_name}"',
-                            query_name=f'"{keyspace}"."{table}"."{column_name}"',
-                            label=column_name,
+                            qualified_identifier=f'"{keyspace}"."{table}"."{column}"',
+                            query_name=f'"{keyspace}"."{table}"."{column}"',
+                            label=column,
                             type_label=self._get_short_type_from_column_type(
                                 column_type
                             ),
@@ -201,33 +212,6 @@ class HarlequinCassandraConnection(HarlequinConnection):
                 )
             )
         return Catalog(items=keyspace_items)
-
-    def _get_tables(self, keyspace_name: str) -> list[str]:
-        tables_result = self.session.execute(
-            f"""
-            SELECT table_name 
-            FROM system_schema.tables
-            WHERE 
-                keyspace_name='{keyspace_name}'
-            ORDER BY table_name asc
-            ;"""
-        )
-        return [table[0] for table in tables_result]
-
-    def _get_columns(
-        self, keyspace_name: str, table_name: str
-    ) -> list[tuple[str, str]]:
-        columns_result = self.session.execute(
-            f"""
-            SELECT column_name, type
-            FROM system_schema.columns
-            WHERE 
-                keyspace_name='{keyspace_name}'
-                AND table_name='{table_name}'
-            ORDER BY column_name asc
-            ;"""
-        )
-        return [(column[0], column[1]) for column in columns_result]
 
     def get_completions(self) -> list[HarlequinCompletion]:
         completions = _get_completions()
