@@ -48,7 +48,7 @@ class HarlequinCassandraCursor(HarlequinCursor):
         return self
 
     def fetchall(self) -> AutoBackendType:
-        result: tuple(list) = tuple([])
+        result: tuple[list[Any]] | None = None
         try:
             if self._limit:
                 self.statement.fetch_size = self._limit
@@ -61,7 +61,7 @@ class HarlequinCassandraCursor(HarlequinCursor):
         if self.data:
             if self._limit:
                 count = 0
-                limited_result: tuple() = ()
+                limited_result: tuple = ()
                 for row in self.data:
                     limited_result = limited_result + (row,)
                     count += 1
@@ -167,16 +167,16 @@ class HarlequinCassandraConnection(HarlequinConnection):
         )
         keyspace_items: list[CatalogItem] = []
         for keyspace in keyspaces_metadata:
-            tables: list[str] = list(keyspaces_metadata.get(keyspace).tables.keys())
+            tables: list[str] = list(keyspaces_metadata.get(keyspace).tables.keys()) #type: ignore
             table_items: list[CatalogItem] = []
             for table in tables:
                 column_items: list[CatalogItem] = []
                 columns: list[str] = list(
-                    keyspaces_metadata.get(keyspace).tables.get(table).columns.keys()
+                    keyspaces_metadata.get(keyspace).tables.get(table).columns.keys() #type: ignore
                 )
                 for column in columns:
                     column_type = (
-                        keyspaces_metadata.get(keyspace)
+                        keyspaces_metadata.get(keyspace) #type:ignore
                         .tables.get(table)
                         .columns.get(column)
                         .cql_type
@@ -250,6 +250,6 @@ class HarlequinCassandraAdapter(HarlequinAdapter):
             auth_options=self.auth_options,
             options=self.options,
             connection_options=self.connection_options,
-            init_message="Connected to Cassandra"
+            init_message="Connected to Cassandra",
         )
         return conn
