@@ -250,5 +250,6 @@ class HarlequinCassandraAdapter(HarlequinAdapter):
             auth_options=self.auth_options,
             options=self.options,
             connection_options=self.connection_options,
+            init_message="Connected to Cassandra"
         )
         return conn
