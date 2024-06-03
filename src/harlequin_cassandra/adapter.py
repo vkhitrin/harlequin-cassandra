@@ -36,11 +36,15 @@ class HarlequinCassandraCursor(HarlequinCursor):
         self._limit: int | None = None
 
     def columns(self) -> list[tuple[str, str]]:
-        names = self.data.column_names
-        types = [
-            self.conn._get_short_type_from_cassandra_class(column_type)
-            for column_type in self.data.column_types
-        ]
+        names = self.data.column_names if self.data.column_names else ()
+        types = (
+            [
+                self.conn._get_short_type_from_cassandra_class(column_type)
+                for column_type in self.data.column_types
+            ]
+            if self.data.column_types
+            else ()
+        )
         return list(zip(names, types))
 
     def set_limit(self, limit: int) -> HarlequinCassandraCursor:
@@ -167,16 +171,16 @@ class HarlequinCassandraConnection(HarlequinConnection):
         )
         keyspace_items: list[CatalogItem] = []
         for keyspace in keyspaces_metadata:
-            tables: list[str] = list(keyspaces_metadata.get(keyspace).tables.keys()) #type: ignore
+            tables: list[str] = list(keyspaces_metadata.get(keyspace).tables.keys())  # type: ignore
             table_items: list[CatalogItem] = []
             for table in tables:
                 column_items: list[CatalogItem] = []
                 columns: list[str] = list(
-                    keyspaces_metadata.get(keyspace).tables.get(table).columns.keys() #type: ignore
+                    keyspaces_metadata.get(keyspace).tables.get(table).columns.keys()  # type: ignore
                 )
                 for column in columns:
                     column_type = (
-                        keyspaces_metadata.get(keyspace) #type:ignore
+                        keyspaces_metadata.get(keyspace)  # type:ignore
                         .tables.get(table)
                         .columns.get(column)
                         .cql_type
