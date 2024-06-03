@@ -1,0 +1,15 @@
+---
+services:
+  db:
+    image: docker.io/cassandra:4.0.13
+    restart: always
+    environment:
+      CASSANDRRA_DC: test
+      CASSANDRRA_RACK: harlequin
+    volumes:
+      - data:/var/lib/cassandra
+    ports:
+      - 9042:9042
+
+volumes:
+  data:
