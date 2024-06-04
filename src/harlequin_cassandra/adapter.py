@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from cassandra.auth import PlainTextAuthProvider
@@ -91,6 +92,7 @@ class HarlequinCassandraConnection(HarlequinConnection):
             auth_provider = PlainTextAuthProvider(**auth_options)
             self.cluster = Cluster(**options, auth_provider=auth_provider)
             self.session = self.cluster.connect(**connection_options)
+            self.session.row_factory = self.cassandra_to_py_factory
         except Exception as e:
             raise HarlequinConnectionError(
                 msg=str(e), title="Harlequin could not connect to Cassandra."
@@ -113,9 +115,58 @@ class HarlequinCassandraConnection(HarlequinConnection):
             return ""
         return query
 
+    # TODO: (vkhitrin) should be revisited in the future.
+    #       Iterrate and work on mapping Cassandra objects to Arrow.
+    #       There might be a benefit in attempting to convert values
+    #       directly to Arrow types.
     @staticmethod
-    def _get_short_type_from_cassandra_class(c_type: CassandraType) -> str:
+    def cassandra_to_py_factory(column_names: list[str], rows: list[Any]) -> Any:
+        """Method to ensure that all values from Cassandra are returned as matching
+        pyarrow objects.
+        """
+        CASSANDRA_TYPES_TO_PYTHON: dict[str, Any] = {
+            "UUID": str,
+            "SortedSet": list,
+            "MapType": dict,
+            "SetType": list,
+            "TupleType": list,
+            "VarcharType": str,
+            "DateType": date,
+            "TimeType": date,
+            "TimestampType": date,
+            "AsciiType": str,
+            "BytesType": bytes,
+            "UTF8Type": str,
+            "BooleanType": bool,
+            "DecimalType": int,
+            "DoubleType": int,
+            "FloatType": int,
+            "Int32Type": int,
+            "LongType": int,
+            "UUIDType": str,
+            "TimeUUIDType": str,
+            "UserType": dict,  # Most likely should be some kind of struct
+            "InetAddressType": str,
+        }
+
+        def cass_to_py(row: Any) -> Any:
+            return [
+                CASSANDRA_TYPES_TO_PYTHON.get(type(value).__name__)(value)
+                if type(value).__name__ in CASSANDRA_TYPES_TO_PYTHON
+                else str(value)
+                for value in row
+            ]
+
+        return [cass_to_py(row) for row in rows]
+
+    @staticmethod
+    def _get_short_type_from_cassandra_class(cassandra_type: CassandraType) -> str:
         MAPPING = {
+            "ListType": "[]",
+            "SortedSet": "[]",
+            "MapType": "{}",
+            "SetType": "[]",
+            "TupleType": "()",
             "VarcharType": "s",
             "DateType": "d",
             "TimeType": "s",
@@ -131,13 +182,17 @@ class HarlequinCassandraConnection(HarlequinConnection):
             "LongType": "##",
             "UUIDType": "uuid",
             "TimeUUIDType": "uuid",
-            "ListType": "[]",
-            "MapType": "{}",
-            "SetType": "[]",
-            "TupleType": "()",
             "UserType": "ut",
+            "InetAddressType": "ip",
         }
-        return MAPPING.get(c_type.__name__, "?")
+        cass_type_name = cassandra_type.__name__
+        if cassandra_type in MAPPING:
+            return MAPPING[cass_type_name]
+
+        for map_type in MAPPING:
+            if map_type in cass_type_name:
+                return MAPPING[map_type]
+        return "?"
 
     @staticmethod
     def _get_short_type_from_column_type(col_type: str) -> str:
@@ -150,9 +205,9 @@ class HarlequinCassandraConnection(HarlequinConnection):
             "date": "d",
             "decimal": "#.#",
             "double": "#.#",
-            "duration": "duration",
+            "duration": "str",  # Should be mapped to Arrow's duration
             "float": "#.#",
-            "inet": "string",
+            "inet": "ip",
             "int": "#",
             "smallint": "#",
             "text": "s",
