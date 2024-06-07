@@ -1,10 +1,10 @@
+from cassandra.cluster import ConsistencyLevel
+
 from harlequin.options import (
-    FlagOption,  # noqa
-    ListOption,  # noqa
-    PathOption,  # noqa
-    SelectOption,  # noqa
+    SelectOption,
     TextOption,
 )
+
 
 
 def _int_validator(s: str | None) -> tuple[bool, str]:
@@ -13,7 +13,7 @@ def _int_validator(s: str | None) -> tuple[bool, str]:
     try:
         _ = int(s)
     except ValueError:
-        return False, f"Cannot convert {s} to an int!"
+        return False, f"Cannot convert '{s}' to an int!"
     else:
         return True, ""
 
@@ -26,7 +26,7 @@ host = TextOption(
         "the rest of the nodes in the cluster and will connect to them."
     ),
     short_decls=["-h"],
-    default=["localhost"],
+    default="localhost",
 )
 
 port = TextOption(
@@ -34,6 +34,7 @@ port = TextOption(
     description=("Port number to connect to at the server host."),
     short_decls=["-p"],
     default="9042",
+    validator=_int_validator,
 )
 
 
@@ -66,4 +67,35 @@ protocol_version = TextOption(
     validator=_int_validator,
 )
 
-cassandra_OPTIONS = [host, port, keyspace, username, password, protocol_version]
+consistency_level = SelectOption(
+    name="consistency-level",
+    description=(
+        "Specifies how many replicas must respond for an operation to be considered a"
+        "success. Default: `LOCAL_ONE`."
+    ),
+    short_decls=["-C"],
+    choices=[
+        "ANY",
+        "ONE",
+        "TWO",
+        "THREE",
+        "QUORUM",
+        "ALL",
+        "LOCAL_QUORUM",
+        "EACH_QUORUM",
+        "SERIAL",
+        "LOCAL_SERIAL",
+        "LOCAL_ONE",
+    ],
+    default="LOCAL_ONE",
+)
+
+CASSANDRA_OPTIONS = [
+    host,
+    port,
+    keyspace,
+    username,
+    password,
+    protocol_version,
+    consistency_level,
+]

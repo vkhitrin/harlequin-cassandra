@@ -130,9 +130,8 @@ def test_set_limit(connection: HarlequinCassandraConnection) -> None:
 
 
 def test_execute_raises_query_error(connection: HarlequinCassandraConnection) -> None:
-    session = connection.execute("selec;")
     with pytest.raises(HarlequinQueryError):
-        _ = session.fetchall()
+        _ = connection.execute("selec;")
 
 
 @pytest.mark.usefixtures("setup_and_teradown_keyspace")
