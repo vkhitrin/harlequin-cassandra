@@ -18,8 +18,12 @@ It is based on [Datastax' cassandra-driver](https://github.com/datastax/python-d
 ## Integration With Harlequin
 
 Cassandra doesn't use cursor(s), thus `HarlequinCursor` and `HarlequinConnection`
-behave differently in this adapter.  
-Some quirks are to be expected.
+behave differently in this adapter.
+
+A manual translation of `cassandra-driver` objects types to Python types is
+required for Apache Arrow to work correctly.
+
+**Some quirks are to be expected.**
 
 ## Things To Resolve
 
@@ -28,7 +32,7 @@ A list of things to resolve before marking this adapter as "stable".
 - [x] Debug issues raised by Arrow during certain `SELECT` statements.
 - [x] Make catalog faster.
 - [x] Add views to catalog.
-- [ ] Add test(s) that create keyspaces, tables.
+- [x] Add test(s) that create keyspaces, tables.
 - [x] Add an option to set the protocol level manually.
 - [ ] Add an option to support execution profiles.
 - [ ] Add an option to support load-balancing policies.
