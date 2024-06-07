@@ -27,7 +27,7 @@ A list of things to resolve before marking this adapter as "stable".
 
 - [x] Debug issues raised by Arrow during certain `SELECT` statements.
 - [x] Make catalog faster.
-- [ ] Add views to catalog.
+- [x] Add views to catalog.
 - [ ] Add test(s) that create keyspaces, tables.
 - [x] Add an option to set the protocol level manually.
 - [ ] Add an option to support execution profiles.

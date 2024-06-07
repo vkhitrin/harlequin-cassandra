@@ -227,20 +227,22 @@ class HarlequinCassandraConnection(HarlequinConnection):
         keyspace_items: list[CatalogItem] = []
         for keyspace in keyspaces_metadata:
             tables: list[str] = list(keyspaces_metadata.get(keyspace).tables.keys())  # type: ignore
+            views: list[str] = list(keyspaces_metadata.get(keyspace).views.keys())  # type:  ignore
             table_items: list[CatalogItem] = []
+            view_items: list[CatalogItem] = []
             for table in tables:
-                column_items: list[CatalogItem] = []
-                columns: list[str] = list(
+                table_column_items: list[CatalogItem] = []
+                table_columns: list[str] = list(
                     keyspaces_metadata.get(keyspace).tables.get(table).columns.keys()  # type: ignore
                 )
-                for column in columns:
+                for column in table_columns:
                     column_type = (
                         keyspaces_metadata.get(keyspace)  # type:ignore
                         .tables.get(table)
                         .columns.get(column)
                         .cql_type
                     )
-                    column_items.append(
+                    table_column_items.append(
                         CatalogItem(
                             qualified_identifier=f'"{keyspace}"."{table}"."{column}"',
                             query_name=f'"{keyspace}"."{table}"."{column}"',
@@ -256,9 +258,40 @@ class HarlequinCassandraConnection(HarlequinConnection):
                         query_name=f'"{keyspace}"."{table}"',
                         label=table,
                         type_label="t",
-                        children=column_items,
+                        children=table_column_items,
                     )
                 )
+                for view in views:
+                    view_column_items: list[CatalogItem] = []
+                    view_columns: list[str] = list(
+                        keyspaces_metadata.get(keyspace).views.get(view).columns.keys()  # type: ignore
+                    )
+                    for column in view_columns:
+                        column_type = (
+                            keyspaces_metadata.get(keyspace)  # type:ignore
+                            .views.get(view)
+                            .columns.get(column)
+                            .cql_type
+                        )
+                        view_column_items.append(
+                            CatalogItem(
+                                qualified_identifier=f'"{keyspace}"."{view}"."{column}"',
+                                query_name=f'"{keyspace}"."{view}"."{column}"',
+                                label=column,
+                                type_label=self._get_short_type_from_column_type(
+                                    column_type
+                                ),
+                            )
+                        )
+                    view_items.append(
+                        CatalogItem(
+                            qualified_identifier=f'"{keyspace}"."{view}"',
+                            query_name=f'"{keyspace}"."{view}"',
+                            label=view,
+                            type_label="v",
+                            children=view_column_items,
+                        )
+                    )
 
             keyspace_items.append(
                 CatalogItem(
@@ -266,7 +299,7 @@ class HarlequinCassandraConnection(HarlequinConnection):
                     query_name=f'"{keyspace}"',
                     label=keyspace,
                     type_label="ks",
-                    children=table_items,
+                    children=table_items + view_items,
                 )
             )
         return Catalog(items=keyspace_items)

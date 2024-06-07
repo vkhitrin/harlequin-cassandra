@@ -238,3 +238,51 @@ def test_insert_into_table(connection: HarlequinCassandraConnection) -> None:
     backend = create_backend(data)
     assert backend.column_count == 3
     assert backend.row_count == 1
+
+
+def test_create_view(connection: HarlequinCassandraConnection) -> None:
+    session = connection.execute("DROP KEYSPACE IF EXISTS test")
+    assert isinstance(session, HarlequinCursor)
+    session.fetchall()
+    session = connection.execute(
+        """
+        CREATE KEYSPACE IF NOT EXISTS test 
+        WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1};
+        """
+    )
+    assert isinstance(session, HarlequinCursor)
+    session.fetchall()
+    session = connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS test.mocktable (
+            id text PRIMARY KEY,
+            name text,
+            position int);
+        """
+    )
+    session.fetchall()
+    session = connection.execute(
+        """
+        INSERT INTO test.mocktable (
+            id,name, position)
+        VALUES ('primary_key', 'test', 1)
+        IF NOT EXISTS;
+        """
+    )
+    session.fetchall()
+    session = connection.execute(
+        """
+        CREATE MATERIALIZED VIEW IF NOT EXISTS test.mockview
+            AS SELECT id, name, position
+        FROM test.mocktable
+            WHERE name IS NOT NULL AND position IS NOT NULL AND id IS NOT NULL
+        PRIMARY KEY (id);
+        """
+    )
+    session.fetchall()
+    session = connection.execute("SELECT * FROM test.mockview;")
+    data = session.fetchall()
+    assert len(session.columns()) == 3
+    backend = create_backend(data)
+    assert backend.column_count == 3
+    assert backend.row_count == 1
