@@ -1,11 +1,15 @@
 ---
 services:
   db:
-    image: docker.io/cassandra:4.0.13
+    image: docker.io/bitnami/cassandra:4.0.13
     restart: always
     environment:
-      CASSANDRRA_DC: test
-      CASSANDRRA_RACK: harlequin
+      CASSANDRA_CLUSTER_NAME: "Test Cluster"
+      CASSANDRA_DATACENTER: "test"
+      CASSANDRA_USER: "cassandra"
+      CASSANDRA_PASSWORD: "cassandra"
+      CASSANDRRA_RACK: "harlequin"
+      DB_CFG_YAML_enable_materialized_views: true
     volumes:
       - data:/var/lib/cassandra
     ports:
