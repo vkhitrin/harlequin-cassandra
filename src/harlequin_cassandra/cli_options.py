@@ -21,7 +21,9 @@ def _int_validator(s: str | None) -> tuple[bool, str]:
 host = TextOption(
     name="host",
     description=(
-        "Specifies the host name of the machine on which the server is running. "
+        "Specifies the initial host to connect to. "
+        "After the driver successfully connects to the node, it will auto discover"
+        "the rest of the nodes in the cluster and will connect to them."
     ),
     short_decls=["-h"],
     default=["localhost"],
