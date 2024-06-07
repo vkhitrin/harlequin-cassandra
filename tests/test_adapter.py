@@ -1,6 +1,8 @@
 import os
 import sys
+from collections.abc import Generator
 from types import NoneType
+from uuid import uuid4
 
 import pytest
 from harlequin.adapter import HarlequinAdapter, HarlequinConnection, HarlequinCursor
@@ -69,6 +71,24 @@ def connection() -> HarlequinCassandraConnection:
     ).connect()
 
 
+@pytest.fixture
+def setup_and_teradown_keyspace(connection: HarlequinCassandraConnection) -> Generator:
+    session = connection.execute(
+        """
+        CREATE KEYSPACE IF NOT EXISTS test
+        WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1};
+        """
+    )
+    assert isinstance(session, HarlequinCursor)
+    session.fetchall()
+    try:
+        yield
+    finally:
+        session = connection.execute("DROP KEYSPACE IF EXISTS test")
+        assert isinstance(session, HarlequinCursor)
+        session.fetchall()
+
+
 def test_get_catalog(connection: HarlequinCassandraConnection) -> None:
     catalog = connection.get_catalog()
     assert isinstance(catalog, Catalog)
@@ -115,54 +135,17 @@ def test_execute_raises_query_error(connection: HarlequinCassandraConnection) ->
         _ = session.fetchall()
 
 
-# TODO: (vkhitrin) most likely a fixture should be created that will autocreate
-#       keyspace(s)
+@pytest.mark.usefixtures("setup_and_teradown_keyspace")
 def test_create_keyspace(connection: HarlequinCassandraConnection) -> None:
-    session = connection.execute(
-        """
-        CREATE KEYSPACE IF NOT EXISTS test 
-        WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1};
-        """
-    )
-    assert isinstance(session, HarlequinCursor)
-    data = session.fetchall()
-    assert isinstance(data, NoneType)
+    assert connection.cluster.metadata.keyspaces.get("test")
 
 
-def test_create_keyspace_raise_query_error(
-    connection: HarlequinCassandraConnection,
-) -> None:
-    session = connection.execute(
-        """
-        CREATE KEYSPACE IF NOT EXISTS test 
-        WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1};
-        """
-    )
-    assert isinstance(session, HarlequinCursor)
-    session.fetchall()
-    session = connection.execute(
-        """
-        CREATE KEYSPACE test 
-        WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1};
-        """
-    )
-    with pytest.raises(HarlequinQueryError):
-        _ = session.fetchall()
-
-
+@pytest.mark.usefixtures("setup_and_teradown_keyspace")
 def test_create_table(connection: HarlequinCassandraConnection) -> None:
     session = connection.execute(
         """
-        CREATE KEYSPACE IF NOT EXISTS test 
-        WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1};
-        """
-    )
-    assert isinstance(session, HarlequinCursor)
-    session.fetchall()
-    session = connection.execute(
-        """
         CREATE TABLE IF NOT EXISTS test.mocktable (
-            id text PRIMARY KEY,
+            id UUID PRIMARY KEY,
             name text,
             position int);
         """
@@ -171,63 +154,22 @@ def test_create_table(connection: HarlequinCassandraConnection) -> None:
     assert isinstance(data, NoneType)
 
 
-def test_create_table_raise_query_error(
-    connection: HarlequinCassandraConnection,
-) -> None:
-    session = connection.execute(
-        """
-        CREATE KEYSPACE IF NOT EXISTS test 
-        WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1};
-        """
-    )
-    assert isinstance(session, HarlequinCursor)
-    session = connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS test.mocktable (
-            id text PRIMARY KEY,
-            name text,
-            position int);
-        """
-    )
-    session.fetchall()
-    session = connection.execute(
-        """
-        CREATE TABLE test.mocktable (
-            id text PRIMARY KEY,
-            name text,
-            position int);
-        """
-    )
-    with pytest.raises(HarlequinQueryError):
-        _ = session.fetchall()
-
-
+@pytest.mark.usefixtures("setup_and_teradown_keyspace")
 def test_insert_into_table(connection: HarlequinCassandraConnection) -> None:
-    session = connection.execute("DROP KEYSPACE IF EXISTS test")
-    assert isinstance(session, HarlequinCursor)
-    session.fetchall()
-    session = connection.execute(
-        """
-        CREATE KEYSPACE IF NOT EXISTS test 
-        WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1};
-        """
-    )
-    assert isinstance(session, HarlequinCursor)
-    session.fetchall()
     session = connection.execute(
         """
         CREATE TABLE IF NOT EXISTS test.mocktable (
-            id text PRIMARY KEY,
+            id UUID PRIMARY KEY,
             name text,
             position int);
         """
     )
     session.fetchall()
     session = connection.execute(
-        """
+        f"""
         INSERT INTO test.mocktable (
             id,name, position)
-        VALUES ('primary_key', 'test', 1)
+        VALUES ({uuid4()}, 'test', 1)
         IF NOT EXISTS;
         """
     )
@@ -240,32 +182,22 @@ def test_insert_into_table(connection: HarlequinCassandraConnection) -> None:
     assert backend.row_count == 1
 
 
+@pytest.mark.usefixtures("setup_and_teradown_keyspace")
 def test_create_view(connection: HarlequinCassandraConnection) -> None:
-    session = connection.execute("DROP KEYSPACE IF EXISTS test")
-    assert isinstance(session, HarlequinCursor)
-    session.fetchall()
-    session = connection.execute(
-        """
-        CREATE KEYSPACE IF NOT EXISTS test 
-        WITH replication = {'class':'SimpleStrategy', 'replication_factor' : 1};
-        """
-    )
-    assert isinstance(session, HarlequinCursor)
-    session.fetchall()
     session = connection.execute(
         """
         CREATE TABLE IF NOT EXISTS test.mocktable (
-            id text PRIMARY KEY,
+            id UUID PRIMARY KEY,
             name text,
             position int);
         """
     )
     session.fetchall()
     session = connection.execute(
-        """
+        f"""
         INSERT INTO test.mocktable (
             id,name, position)
-        VALUES ('primary_key', 'test', 1)
+        VALUES ({uuid4()}, 'test', 1)
         IF NOT EXISTS;
         """
     )
