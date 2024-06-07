@@ -1,39 +1,41 @@
 from __future__ import annotations
 
 from datetime import date
+from itertools import cycle
 from typing import Any
 
 from cassandra.auth import PlainTextAuthProvider
-from cassandra.cluster import Cluster, ResultSet, Session
+from cassandra.cluster import (
+    Cluster,
+    ConsistencyLevel,
+    PreparedStatement,
+    Session,
+)
 from cassandra.cqltypes import CassandraType
 from cassandra.metadata import KeyspaceMetadata
 from cassandra.protocol import SyntaxException
-from cassandra.query import SimpleStatement
 from harlequin import (
     HarlequinAdapter,
     HarlequinConnection,
     HarlequinCursor,
+    HarlequinTransactionMode,
 )
 from harlequin.autocomplete.completion import HarlequinCompletion
 from harlequin.catalog import Catalog, CatalogItem
 from harlequin.exception import HarlequinConnectionError, HarlequinQueryError
+from harlequin.options import HarlequinAdapterOption
 from textual_fastdatatable.backend import AutoBackendType
 
-from harlequin_cassandra.cli_options import cassandra_OPTIONS
+from harlequin_cassandra.cli_options import CASSANDRA_OPTIONS
 from harlequin_cassandra.completions import _get_completions
 
 
 class HarlequinCassandraCursor(HarlequinCursor):
     def __init__(
-        self,
-        conn: HarlequinCassandraConnection,
-        session: Session,
-        statement: SimpleStatement,
+        self, conn: HarlequinCassandraConnection, statement: PreparedStatement
     ) -> None:
         self.conn = conn
-        self.session = session
         self.statement = statement
-        self.data: ResultSet = None
         self._limit: int | None = None
 
     def columns(self) -> list[tuple[str, str]]:
@@ -55,9 +57,7 @@ class HarlequinCassandraCursor(HarlequinCursor):
     def fetchall(self) -> AutoBackendType:
         result: tuple[list[Any]] | None = None
         try:
-            if self._limit:
-                self.statement.fetch_size = self._limit
-            self.data = self.session.execute(self.statement)
+            self.data = self.conn.conn.execute(self.statement)
         except Exception as e:
             raise HarlequinQueryError(
                 msg=str(e),
@@ -81,83 +81,39 @@ class HarlequinCassandraCursor(HarlequinCursor):
 class HarlequinCassandraConnection(HarlequinConnection):
     def __init__(
         self,
-        *args: Any,
+        conn: Session,
+        cluster: Cluster,
         init_message: str = "",
-        auth_options: dict[str, Any],
-        options: dict[str, Any],
-        connection_options: dict[str, Any],
     ) -> None:
+        self.conn = conn
         self.init_message = init_message
-        try:
-            auth_provider = PlainTextAuthProvider(**auth_options)
-            self.cluster = Cluster(**options, auth_provider=auth_provider)
-            self.session = self.cluster.connect(**connection_options)
-            self.session.row_factory = self.cassandra_to_py_factory
-        except Exception as e:
-            raise HarlequinConnectionError(
-                msg=str(e), title="Harlequin could not connect to Cassandra."
-            ) from e
+        self.cluster = cluster
+
+        # NOTE: (vkhitrin) label is limitted to 10 characters,
+        #       if it's longer, it will not be displayed
+        self._transaction_modes: list[HarlequinTransactionMode | None] = [
+            HarlequinTransactionMode(label=level[:10])
+            for level in ConsistencyLevel.name_to_value
+        ]
+        self._transaction_mode_gen = cycle(self._transaction_modes)
+        self._transaction_mode = next(self._transaction_mode_gen)
 
     def execute(self, query: str) -> HarlequinCursor | None:
         try:
-            statement = SimpleStatement(query)
+            statement: PreparedStatement = self.conn.prepare(query)
         except Exception as e:
             raise HarlequinQueryError(
                 msg=str(e),
                 title="Harlequin encountered an error while preparing your query.",
             ) from e
-        return HarlequinCassandraCursor(self, self.session, statement)
+        return HarlequinCassandraCursor(self, statement)
 
     def validate_sql(self, query: str) -> str:
         try:
-            self.session.prepare(query)
+            self.conn.prepare(query)
         except SyntaxException:
             return ""
         return query
-
-    # TODO: (vkhitrin) should be revisited in the future.
-    #       Iterrate and work on mapping Cassandra objects to Arrow.
-    #       There might be a benefit in attempting to convert values
-    #       directly to Arrow types.
-    @staticmethod
-    def cassandra_to_py_factory(column_names: list[str], rows: list[Any]) -> Any:
-        """Method to ensure that all values from Cassandra are returned as matching
-        pyarrow objects.
-        """
-        CASSANDRA_TYPES_TO_PYTHON: dict[str, Any] = {
-            "UUID": str,
-            "SortedSet": list,
-            "MapType": dict,
-            "SetType": list,
-            "TupleType": list,
-            "VarcharType": str,
-            "DateType": date,
-            "TimeType": date,
-            "TimestampType": date,
-            "AsciiType": str,
-            "BytesType": bytes,
-            "UTF8Type": str,
-            "BooleanType": bool,
-            "DecimalType": int,
-            "DoubleType": int,
-            "FloatType": int,
-            "Int32Type": int,
-            "LongType": int,
-            "UUIDType": str,
-            "TimeUUIDType": str,
-            "UserType": dict,  # Most likely should be some kind of struct
-            "InetAddressType": str,
-        }
-
-        def cass_to_py(row: Any) -> Any:
-            return [
-                CASSANDRA_TYPES_TO_PYTHON.get(type(value).__name__)(value)
-                if type(value).__name__ in CASSANDRA_TYPES_TO_PYTHON
-                else str(value)
-                for value in row
-            ]
-
-        return [cass_to_py(row) for row in rows]
 
     @staticmethod
     def _get_short_type_from_cassandra_class(cassandra_type: CassandraType) -> str:
@@ -309,18 +265,55 @@ class HarlequinCassandraConnection(HarlequinConnection):
         return completions
         ...
 
+    @property
+    def transaction_mode(self) -> HarlequinTransactionMode | None:
+        consistency_level = self.conn.default_consistency_level
+        for t_mode in self._transaction_modes:
+            if t_mode.label == ConsistencyLevel.value_to_name.get(consistency_level)[:10]:
+                return t_mode
+
+    def toggle_transaction_mode(self) -> HarlequinTransactionMode | None:
+        new_mode = next(self._transaction_mode_gen)
+        self._transaction_mode = new_mode
+        self._sync_connection_transaction_mode()
+        return new_mode
+
+    def _sync_connection_transaction_mode(self) -> None:
+        logical_level_name = self._transaction_mode.label
+        # NOTE: (vkhitrin): Workaround due to the limitation of partial
+        #       labels for long consistency level names
+        if logical_level_name == "LOCAL_QUOR":
+            logical_level_name = "LOCAL_QUORUM"
+        elif logical_level_name == "EACH_QUORU":
+            logical_level_name = "EACH_QUORUM"
+        elif logical_level_name == "LOCAL_SERI":
+            logical_level_name = "LOCAL_SERIAL"
+
+        new_consistency_level = ConsistencyLevel.name_to_value.get(
+            logical_level_name
+        )
+        self.conn.default_consistency_level = new_consistency_level
+        return
+
+    def close(self) -> None:
+        self.cluster.shutdown()
+
 
 class HarlequinCassandraAdapter(HarlequinAdapter):
-    ADAPTER_OPTIONS = cassandra_OPTIONS
+    ADAPTER_OPTIONS: list[HarlequinAdapterOption] = CASSANDRA_OPTIONS
 
+    # NOTE: (vkhitrin) this is most likely not the correct way
+    #       to apply defaults. Without this explicit definition
+    #       defaults are not applied.
     def __init__(
         self,
-        host: str | None = None,
-        port: str | None = None,
-        keyspace: str | None = None,
-        username: str | None = None,
-        password: str | None = None,
-        protocol_version: int | None = None,
+        host: str = CASSANDRA_OPTIONS[0].default,
+        port: str = CASSANDRA_OPTIONS[1].default,
+        keyspace: str = CASSANDRA_OPTIONS[2].default,
+        username: str = CASSANDRA_OPTIONS[3].default,
+        password: str = CASSANDRA_OPTIONS[4].default,
+        protocol_version: int = CASSANDRA_OPTIONS[5].default,
+        consistency_level: str = CASSANDRA_OPTIONS[6].default,
         **_: Any,
     ) -> None:
         self.auth_options = {
@@ -336,12 +329,66 @@ class HarlequinCassandraAdapter(HarlequinAdapter):
             self.options["protocol_version"] = int(protocol_version)
         if keyspace:
             self.connection_options["keyspace"] = keyspace
+        self.consistency_level = consistency_level
+
+    # TODO: (vkhitrin) should be revisited in the future.
+    #       Iterrate and work on mapping Cassandra objects to Arrow.
+    #       There might be a benefit in attempting to convert values
+    #       directly to Arrow types.
+    @staticmethod
+    def _cassandra_to_py_factory(column_names: list[str], rows: list[Any]) -> Any:
+        """Method to ensure that all values from Cassandra are returned as matching
+        pyarrow objects.
+        """
+        CASSANDRA_TYPES_TO_PYTHON: dict[str, Any] = {
+            "UUID": str,
+            "SortedSet": list,
+            "MapType": dict,
+            "SetType": list,
+            "TupleType": tuple,
+            "VarcharType": str,
+            "DateType": date,
+            "TimeType": date,
+            "TimestampType": date,
+            "AsciiType": str,
+            "BytesType": bytes,
+            "UTF8Type": str,
+            "BooleanType": bool,
+            "DecimalType": int,
+            "DoubleType": int,
+            "FloatType": int,
+            "Int32Type": int,
+            "LongType": int,
+            "UUIDType": str,
+            "TimeUUIDType": str,
+            "UserType": dict,  # Most likely should be some kind of struct
+            "InetAddressType": str,
+        }
+
+        def cass_to_py(row: Any) -> Any:
+            return [
+                CASSANDRA_TYPES_TO_PYTHON.get(type(value).__name__)(value)
+                if type(value).__name__ in CASSANDRA_TYPES_TO_PYTHON
+                else str(value)
+                for value in row
+            ]
+
+        return [tuple(cass_to_py(row)) for row in rows]
 
     def connect(self) -> HarlequinCassandraConnection:
-        conn = HarlequinCassandraConnection(
-            auth_options=self.auth_options,
-            options=self.options,
-            connection_options=self.connection_options,
-            init_message="Connected to Cassandra",
+        try:
+            auth_provider = PlainTextAuthProvider(**self.auth_options)
+            self.cluster = Cluster(**self.options, auth_provider=auth_provider)
+            conn = self.cluster.connect(**self.connection_options)
+            conn.row_factory = self._cassandra_to_py_factory
+            conn.default_consistency_level = ConsistencyLevel.name_to_value.get(
+                self.consistency_level
+            )
+        except Exception as e:
+            raise HarlequinConnectionError(
+                msg=f"Excpetion: {e.__class__}, Message: {e}",
+                title="Harlequin could not connect to Cassandra.",
+            ) from e
+        return HarlequinCassandraConnection(
+            conn=conn, cluster=self.cluster, init_message="Connected to Cassandra."
         )
-        return conn

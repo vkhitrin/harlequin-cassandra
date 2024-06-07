@@ -36,4 +36,4 @@ A list of things to resolve before marking this adapter as "stable".
 - [x] Add an option to set the protocol level manually.
 - [ ] Add an option to support execution profiles.
 - [ ] Add an option to support load-balancing policies.
-- [ ] Add an option to support consistency levels.
+- [x] Add an option to support consistency levels.
