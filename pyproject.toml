@@ -2,11 +2,16 @@
 name = "harlequin-cassandra"
 version = "0.1.0"
 description = "A Harlequin adapter for Cassandra."
-authors = ["Vadim Khitrin <vkhitrin@users.noreply.github.com>"]
+authors = ["Vadim Khitrin <me@vkhitrin.com>"]
 license = "MIT"
 readme = "README.md"
-packages = [
-    { include = "harlequin_cassandra", from = "src" },
+packages = [{ include = "harlequin_cassandra", from = "src" }]
+repository = "https://github.com/vkhitrin/harlequin-cassandra"
+classifiers = [
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
 ]
 
 [tool.poetry.plugins."harlequin.adapter"]
@@ -35,10 +40,7 @@ target-version = "py38"
 
 [tool.mypy]
 python_version = "3.8"
-files = [
-    "src/**/*.py",
-    "tests/**/*.py",
-]
+files = ["src/**/*.py", "tests/**/*.py"]
 mypy_path = "src:stubs"
 
 show_column_numbers = true
