@@ -223,16 +223,6 @@ textual-textarea = "0.13.0"
 tomli = {version = ">=2.0.1,<3.0.0", markers = "python_full_version < \"3.11.0\""}
 tomlkit = ">=0.12.3,<0.13.0"
 
-[package.extras]
-adbc = ["harlequin-adbc (>=0.1,<0.2)"]
-bigquery = ["harlequin-bigquery (>=1.0,<2.0)"]
-databricks = ["harlequin-databricks (>=0.1,<0.2)"]
-mysql = ["harlequin-mysql (>=0.1,<0.2)"]
-odbc = ["harlequin-odbc (>=0.1,<0.2)"]
-postgres = ["harlequin-postgres (>=0.2,<0.3)"]
-s3 = ["boto3 (>=1.34.22,<2.0.0)"]
-trino = ["harlequin-trino (>=0.1,<0.2)"]
-
 [[package]]
 name = "identify"
 version = "2.5.36"
