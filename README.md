@@ -66,6 +66,10 @@ pipx inject harlequin harlequin-cassandra
 
 Will be updated once the following PRs are merged:
 
+https://github.com/tconbeer/harlequin-web/pull/88
+
+https://github.com/tconbeer/harlequin/pull/565
+
 ## Usage and Configuration
 
 You can open Harlequin with the Cassandra adapter by selecting it with the `-a` option and passing an initial hostname and credentials(if required).
