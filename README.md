@@ -64,11 +64,9 @@ pipx inject harlequin harlequin-cassandra
 
 ### As an Extra
 
-Will be updated once the following PRs are merged:
-
-https://github.com/tconbeer/harlequin-web/pull/88
-
-https://github.com/tconbeer/harlequin/pull/565
+```bash
+pip install harlequin[cassandra]
+```
 
 ## Usage and Configuration
 
