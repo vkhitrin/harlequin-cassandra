@@ -6,7 +6,6 @@ from harlequin.options import (
 )
 
 
-
 def _int_validator(s: str | None) -> tuple[bool, str]:
     if s is None:
         return True, ""
@@ -45,10 +44,10 @@ keyspace = TextOption(
 )
 
 
-username = TextOption(
-    name="username",
+user = TextOption(
+    name="user",
     description=("Cassandra user name to connect as."),
-    short_decls=["-u"],
+    short_decls=["-u", "--username"],
 )
 
 
@@ -94,7 +93,7 @@ CASSANDRA_OPTIONS = [
     host,
     port,
     keyspace,
-    username,
+    user,
     password,
     protocol_version,
     consistency_level,

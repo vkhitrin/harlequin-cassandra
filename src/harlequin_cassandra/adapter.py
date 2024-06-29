@@ -269,7 +269,10 @@ class HarlequinCassandraConnection(HarlequinConnection):
     def transaction_mode(self) -> HarlequinTransactionMode | None:
         consistency_level = self.conn.default_consistency_level
         for t_mode in self._transaction_modes:
-            if t_mode.label == ConsistencyLevel.value_to_name.get(consistency_level)[:10]:
+            if (
+                t_mode.label
+                == ConsistencyLevel.value_to_name.get(consistency_level)[:10]
+            ):
                 return t_mode
 
     def toggle_transaction_mode(self) -> HarlequinTransactionMode | None:
@@ -289,9 +292,7 @@ class HarlequinCassandraConnection(HarlequinConnection):
         elif logical_level_name == "LOCAL_SERI":
             logical_level_name = "LOCAL_SERIAL"
 
-        new_consistency_level = ConsistencyLevel.name_to_value.get(
-            logical_level_name
-        )
+        new_consistency_level = ConsistencyLevel.name_to_value.get(logical_level_name)
         self.conn.default_consistency_level = new_consistency_level
         return
 
@@ -310,14 +311,18 @@ class HarlequinCassandraAdapter(HarlequinAdapter):
         host: str = CASSANDRA_OPTIONS[0].default,
         port: str = CASSANDRA_OPTIONS[1].default,
         keyspace: str = CASSANDRA_OPTIONS[2].default,
-        username: str = CASSANDRA_OPTIONS[3].default,
-        password: str = CASSANDRA_OPTIONS[4].default,
+        user: str | None = None
+        if not CASSANDRA_OPTIONS[3].default
+        else CASSANDRA_OPTIONS[3].default,
+        password: str | None = None
+        if not CASSANDRA_OPTIONS[4].default
+        else CASSANDRA_OPTIONS[4].default,
         protocol_version: int = CASSANDRA_OPTIONS[5].default,
         consistency_level: str = CASSANDRA_OPTIONS[6].default,
         **_: Any,
     ) -> None:
         self.auth_options = {
-            "username": username,
+            "username": user,
             "password": password,
         }
         self.options: dict[str, Any] = {
@@ -387,8 +392,8 @@ class HarlequinCassandraAdapter(HarlequinAdapter):
         except Exception as e:
             raise HarlequinConnectionError(
                 msg=f"Excpetion: {e.__class__}, Message: {e}",
-                title="Harlequin could not connect to Cassandra.",
+                title="Harlequin could not connect to a Cassandra Cluster.",
             ) from e
         return HarlequinCassandraConnection(
-            conn=conn, cluster=self.cluster, init_message="Connected to Cassandra."
+            conn=conn, cluster=self.cluster, init_message="Connected to a Cassandra Cluster."
         )
