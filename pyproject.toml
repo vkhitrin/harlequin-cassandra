@@ -19,7 +19,7 @@ cassandra = "harlequin_cassandra:HarlequinCassandraAdapter"
 
 [tool.poetry.dependencies]
 python = ">=3.8.1,<4.0"
-harlequin = "^1.20"
+harlequin = ">=1.20,<3"
 cassandra-driver = "^3.29.1"
 
 [tool.poetry.group.dev.dependencies]
