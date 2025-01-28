@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "harlequin-cassandra"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Harlequin adapter for Cassandra."
 authors = ["Vadim Khitrin <me@vkhitrin.com>"]
 license = "MIT"
