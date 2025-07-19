@@ -1,7 +1,7 @@
 ---
 services:
   db:
-    image: docker.io/bitnami/cassandra:4.0.13
+    image: docker.io/bitnamilegacy/cassandra:4.0.13
     restart: always
     environment:
       CASSANDRA_CLUSTER_NAME: "Test Cluster"
