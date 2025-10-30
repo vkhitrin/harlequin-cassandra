@@ -8,11 +8,12 @@ import pytest
 from harlequin.adapter import HarlequinAdapter, HarlequinConnection, HarlequinCursor
 from harlequin.catalog import Catalog, CatalogItem
 from harlequin.exception import HarlequinConnectionError, HarlequinQueryError
+from textual_fastdatatable.backend import create_backend
+
 from harlequin_cassandra.adapter import (
     HarlequinCassandraAdapter,
     HarlequinCassandraConnection,
 )
-from textual_fastdatatable.backend import create_backend
 
 if sys.version_info < (3, 10):
     from importlib_metadata import entry_points
@@ -20,20 +21,12 @@ else:
     from importlib.metadata import entry_points
 
 TEST_AUTH_OPTIONS = {
-    "username": os.environ.get("HARLEQUIN_CASSANDRA_TEST_USERNAME")
-    if os.environ.get("HARLEQUIN_CASSANDRA_TEST_USERNAME")
-    else "cassandra",
-    "password": os.environ.get("HARLEQUIN_CASSANDRA_TEST_PASSWORD")
-    if os.environ.get("HARLEQUIN_CASSANDRA_TEST_PASSWORD")
-    else "cassandra",
+    "user": os.environ.get("HARLEQUIN_CASSANDRA_TEST_USERNAME", "cassandra"),
+    "password": os.environ.get("HARLEQUIN_CASSANDRA_TEST_PASSWORD", "cassandra"),
 }
 TEST_CONNECTION_OPTIONS = {
-    "host": os.environ.get("HARLEQUIN_CASSANDRA_TEST_HOST")
-    if os.environ.get("HARLEQUIN_CASSANDRA_TEST_HOST")
-    else "localhost",
-    "port": os.environ.get("HARLEQUIN_CASSANDRA_PORT")
-    if os.environ.get("HARLEQUIN_CASSANDRA_PORT")
-    else "9042",
+    "host": os.environ.get("HARLEQUIN_CASSANDRA_TEST_HOST", "localhost"),
+    "port": os.environ.get("HARLEQUIN_CASSANDRA_PORT", "9042"),
 }
 
 
@@ -51,12 +44,15 @@ def test_connect() -> None:
         **TEST_AUTH_OPTIONS, **TEST_CONNECTION_OPTIONS
     ).connect()
     assert isinstance(conn, HarlequinConnection)
+    conn.close()
 
 
 def test_init_extra_kwargs() -> None:
-    assert HarlequinCassandraAdapter(
+    conn = HarlequinCassandraAdapter(
         **TEST_AUTH_OPTIONS, **TEST_CONNECTION_OPTIONS, keyspace="system"
     ).connect()
+    assert conn
+    conn.close()
 
 
 def test_connect_raises_connection_error() -> None:
@@ -65,10 +61,14 @@ def test_connect_raises_connection_error() -> None:
 
 
 @pytest.fixture
-def connection() -> HarlequinCassandraConnection:
-    return HarlequinCassandraAdapter(
+def connection() -> Generator:
+    conn = HarlequinCassandraAdapter(
         **TEST_AUTH_OPTIONS, **TEST_CONNECTION_OPTIONS, keyspace="system"
     ).connect()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 @pytest.fixture
@@ -149,6 +149,7 @@ def test_create_table(connection: HarlequinCassandraConnection) -> None:
             position int);
         """
     )
+    assert isinstance(session, HarlequinCursor)
     data = session.fetchall()
     assert isinstance(data, NoneType)
 
@@ -163,6 +164,7 @@ def test_insert_into_table(connection: HarlequinCassandraConnection) -> None:
             position int);
         """
     )
+    assert isinstance(session, HarlequinCursor)
     session.fetchall()
     session = connection.execute(
         f"""
@@ -172,8 +174,10 @@ def test_insert_into_table(connection: HarlequinCassandraConnection) -> None:
         IF NOT EXISTS;
         """
     )
+    assert isinstance(session, HarlequinCursor)
     session.fetchall()
     session = connection.execute("SELECT * FROM test.mocktable;")
+    assert isinstance(session, HarlequinCursor)
     data = session.fetchall()
     assert len(session.columns()) == 3
     backend = create_backend(data)
@@ -191,6 +195,7 @@ def test_create_view(connection: HarlequinCassandraConnection) -> None:
             position int);
         """
     )
+    assert isinstance(session, HarlequinCursor)
     session.fetchall()
     session = connection.execute(
         f"""
@@ -200,6 +205,7 @@ def test_create_view(connection: HarlequinCassandraConnection) -> None:
         IF NOT EXISTS;
         """
     )
+    assert isinstance(session, HarlequinCursor)
     session.fetchall()
     session = connection.execute(
         """
@@ -210,8 +216,10 @@ def test_create_view(connection: HarlequinCassandraConnection) -> None:
         PRIMARY KEY (id);
         """
     )
+    assert isinstance(session, HarlequinCursor)
     session.fetchall()
     session = connection.execute("SELECT * FROM test.mockview;")
+    assert isinstance(session, HarlequinCursor)
     data = session.fetchall()
     assert len(session.columns()) == 3
     backend = create_backend(data)
