@@ -3,7 +3,7 @@ name = "harlequin-cassandra"
 version = "0.1.3"
 description = "A Harlequin adapter for Cassandra."
 authors = [{ name = "Vadim Khitrin", email = "me@vkhitrin.com" }]
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.10, <3.14"
 readme = "README.md"
 license = "MIT"
 classifiers = [
@@ -14,7 +14,7 @@ classifiers = [
 ]
 dependencies = [
     "harlequin>=1.25,<3",
-    "cassandra-driver>=3.29.1,<4",
+    "cassandra-driver>=3.29.3,<4",
 ]
 
 [project.urls]
