@@ -1,6 +1,6 @@
 [project]
 name = "harlequin-cassandra"
-version = "0.1.3"
+version = "0.1.4"
 description = "A Harlequin adapter for Cassandra."
 authors = [{ name = "Vadim Khitrin", email = "me@vkhitrin.com" }]
 requires-python = ">=3.10, <3.14"
